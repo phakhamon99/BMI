@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BMI Health Tracker & Analytics System</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts: Kanit -->
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js for data visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Kanit', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Kanit', sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      min-height: 100vh;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(229, 231, 235, 0.8);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+    }
+
+    .gauge-bar-marker {
+      transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Custom Scrollbar for tables */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="text-slate-800 p-3 sm:p-6 md:p-8">
+
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Top Navigation Header -->
+    <header class="glass-card rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg shadow-indigo-200">
+          <i class="fa-solid fa-heart-pulse"></i>
+        </div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-bold text-slate-800">ระบบคำนวณและบันทึกค่า BMI</h1>
+          <p class="text-xs sm:text-sm text-slate-500">BMI Health Tracking & Data Synchronization</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+        <button onclick="toggleModal('scriptModal')" class="px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition flex items-center gap-2">
+          <i class="fa-solid fa-code text-indigo-600"></i> โค้ด Apps Script
+        </button>
+        <button onclick="toggleModal('settingsModal')" class="px-3.5 py-2 text-xs sm:text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-md shadow-indigo-100 flex items-center gap-2">
+          <i class="fa-solid fa-plug"></i> เชื่อมต่อ Google Sheet
+        </button>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Left Column: Input Form & Quick Settings -->
+      <div class="lg:col-span-5 space-y-6">
+        
+        <!-- Calculator Form Card -->
+        <div class="glass-card rounded-2xl p-6">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-5">
+            <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-calculator text-indigo-600"></i> ป้อนข้อมูลผู้ใช้งาน
+            </h2>
+            <span class="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full font-medium">Asian Standard</span>
+          </div>
+
+          <form id="bmiForm" onsubmit="calculateAndSave(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">ชื่อ - นามสกุล / ชื่อเล่น <span class="text-red-500">*</span></label>
+              <div class="relative">
+                <i class="fa-solid fa-user absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                <input type="text" id="userName" required placeholder="เช่น สมชาย ใจดี" 
+                       class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">อายุ (ปี)</label>
+                <div class="relative">
+                  <i class="fa-solid fa-cake-candles absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                  <input type="number" id="userAge" min="1" max="120" placeholder="25"
+                         class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">เพศ</label>
+                <div class="relative">
+                  <i class="fa-solid fa-venus-mars absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                  <select id="userGender" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition appearance-none">
+                    <option value="male">ชาย</option>
+                    <option value="female">หญิง</option>
+                    <option value="other">อื่นๆ</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">น้ำหนัก (kg) <span class="text-red-500">*</span></label>
+                <div class="relative">
+                  <i class="fa-solid fa-weight-scale absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                  <input type="number" id="userWeight" step="0.1" min="1" max="300" required placeholder="65.5"
+                         class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">ส่วนสูง (cm) <span class="text-red-500">*</span></label>
+                <div class="relative">
+                  <i class="fa-solid fa-ruler-vertical absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                  <input type="number" id="userHeight" step="0.1" min="30" max="250" required placeholder="170"
+                         class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition">
+                </div>
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="pt-2">
+              <button type="submit" id="submitBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl transition shadow-lg shadow-indigo-200 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-calculator"></i> คำนวณและบันทึกข้อมูล
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Sync Status Card -->
+        <div class="glass-card rounded-2xl p-5 border-l-4 border-indigo-500 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 text-lg">
+              <i class="fa-solid fa-file-excel"></i>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-slate-500">สถานะ Google Sheets Sync</p>
+              <p id="syncStatusText" class="text-sm font-bold text-amber-600">ยังไม่ได้เชื่อมต่อ URL</p>
+            </div>
+          </div>
+          <button onclick="toggleModal('settingsModal')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition">
+            ตั้งค่า
+          </button>
+        </div>
+      </div>
+
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- Result Display Card -->
+        <div class="glass-card rounded-2xl p-6 relative overflow-hidden">
+          <h2 class="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-4 mb-5 flex items-center justify-between">
+            <span><i class="fa-solid fa-chart-line text-indigo-600 mr-2"></i> ผลการประเมิน BMI</span>
+            <span id="resultTimestamp" class="text-xs text-slate-400 font-normal">--:--</span>
+          </h2>
+
+          <div id="noResultPlaceholder" class="py-12 text-center text-slate-400">
+            <i class="fa-solid fa-person-rays text-5xl mb-3 text-slate-300"></i>
+            <p class="text-sm">กรอกข้อมูลทางด้านซ้ายเพื่อทำการคำนวณดัชนีมวลกาย</p>
+          </div>
+
+          <div id="resultContent" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-6 bg-slate-50 rounded-2xl p-5 border border-slate-100">
+              <div class="text-center sm:text-left">
+                <span class="text-xs text-slate-500 uppercase tracking-wider font-semibold">ค่า BMI ของคุณ</span>
+                <div class="flex items-baseline justify-center sm:justify-start gap-2 mt-1">
+                  <span id="bmiScoreText" class="text-5xl font-black text-indigo-600">0.0</span>
+                  <span class="text-xs text-slate-400">kg/m²</span>
+                </div>
+                <p id="userNameDisplay" class="text-sm font-medium text-slate-700 mt-1">--</p>
+              </div>
+
+              <div class="text-center sm:text-right">
+                <span id="bmiCategoryBadge" class="inline-block px-4 py-1.5 rounded-full text-sm font-bold bg-emerald-100 text-emerald-700 mb-2">
+                  ปกติ (สุขภาพดี)
+                </span>
+                <p class="text-xs text-slate-500">เกณฑ์มาตรฐานเอเชีย (Asian Scale)</p>
+                <p id="healthyWeightRange" class="text-xs font-medium text-slate-600 mt-1">น้ำหนักที่เหมาะสม: -- kg</p>
+              </div>
+            </div>
+
+            <!-- BMI Gauge / Bar -->
+            <div class="space-y-2">
+              <div class="flex justify-between text-[11px] sm:text-xs text-slate-500 font-medium">
+                <span>ผอม (&lt;18.5)</span>
+                <span>ปกติ (18.5-22.9)</span>
+                <span>ท้วม (23-24.9)</span>
+                <span>อ้วน 1 (25-29.9)</span>
+                <span>อ้วน 2 (&ge;30)</span>
+              </div>
+              
+              <!-- Gradient Bar -->
+              <div class="relative h-4 w-full bg-slate-200 rounded-full overflow-hidden flex">
+                <div class="w-[20%] bg-blue-400 h-full" title="น้ำหนักน้อย / ผอม"></div>
+                <div class="w-[25%] bg-emerald-500 h-full" title="ปกติ"></div>
+                <div class="w-[15%] bg-yellow-400 h-full" title="ท้วม / น้ำหนักเกิน"></div>
+                <div class="w-[20%] bg-orange-500 h-full" title="อ้วนระดับ 1"></div>
+                <div class="w-[20%] bg-red-500 h-full" title="อ้วนระดับ 2"></div>
+              </div>
+
+              <!-- Gauge Marker -->
+              <div class="relative h-6">
+                <div id="gaugeMarker" class="gauge-bar-marker absolute top-0 -translate-x-1/2 flex flex-col items-center" style="left: 0%;">
+                  <i class="fa-solid fa-caret-up text-indigo-600 text-lg"></i>
+                </div>
+              </div>
+            </div>
+
+            <!-- Health Tip Box -->
+            <div id="healthTipBox" class="p-4 rounded-xl bg-indigo-50 border border-indigo-100 text-xs sm:text-sm text-indigo-900 flex items-start gap-3">
+              <i class="fa-solid fa-circle-info text-indigo-600 text-base mt-0.5"></i>
+              <div id="healthTipText">คำแนะนำสุขภาพจะแสดงที่นี่</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Stats Summary Cards (Left Column) -->
+      <div class="lg:col-span-4 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="glass-card p-4 rounded-2xl">
+            <p class="text-xs text-slate-500 font-medium">บันทึกทั้งหมด</p>
+            <p id="statTotalUsers" class="text-2xl font-bold text-slate-800 mt-1">0</p>
+            <p class="text-[10px] text-slate-400 mt-0.5">รายการ</p>
+          </div>
+
+          <div class="glass-card p-4 rounded-2xl">
+            <p class="text-xs text-slate-500 font-medium">ค่า BMI เฉลี่ย</p>
+            <p id="statAvgBmi" class="text-2xl font-bold text-indigo-600 mt-1">0.0</p>
+            <p class="text-[10px] text-slate-400 mt-0.5">kg/m²</p>
+          </div>
+        </div>
+
+        <!-- Category Distribution Chart Card -->
+        <div class="glass-card rounded-2xl p-5">
+          <h3 class="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-chart-pie text-indigo-600"></i> สัดส่วนเกณฑ์สุขภาพ
+          </h3>
+          <div class="h-48 relative flex items-center justify-center">
+            <canvas id="bmiChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Table Card (Right Column) -->
+      <div class="lg:col-span-8 glass-card rounded-2xl p-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
+          <div>
+            <h3 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-indigo-600"></i> ประวัติการบันทึกข้อมูลผู้เข้าใช้งาน
+            </h3>
+            <p class="text-xs text-slate-500">รายการผู้ประเมินดัชนีมวลกายทั้งหมด</p>
+          </div>
+
+          <!-- Table Controls -->
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <input type="text" id="searchInput" oninput="filterHistory()" placeholder="ค้นหาชื่อ..." 
+                   class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-indigo-500 w-full sm:w-40">
+            <button onclick="exportToCSV()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-file-csv"></i> ส่งออก CSV
+            </button>
+            <button onclick="clearHistory()" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-medium transition shrink-0">
+              ล้างประวัติ
+            </button>
+          </div>
+        </div>
+
+        <!-- History Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-100">
+              <tr>
+                <th class="py-3 px-3">วัน-เวลา</th>
+                <th class="py-3 px-3">ชื่อ</th>
+                <th class="py-3 px-3">น้ำหนัก/ส่วนสูง</th>
+                <th class="py-3 px-3">BMI</th>
+                <th class="py-3 px-3">ผลการประเมิน</th>
+                <th class="py-3 px-3 text-right">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody" class="divide-y divide-slate-100">
+              <!-- Dynamic Rows inserted here -->
+            </tbody>
+          </table>
+          <div id="noHistoryText" class="text-center py-8 text-slate-400 text-xs">
+            ยังไม่มีประวัติการบันทึกข้อมูล
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-card rounded-2xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl">
+      <button onclick="toggleModal('settingsModal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <div class="flex items-center gap-3 border-b border-slate-100 pb-3">
+        <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-lg">
+          <i class="fa-solid fa-gears"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-800">ตั้งค่า Google Sheets Webhook</h3>
+          <p class="text-xs text-slate-500">ซิงค์บันทึกข้อมูลเข้าสู่ Google Sheets อัตโนมัติ</p>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Google Apps Script Web App URL</label>
+          <input type="url" id="sheetUrlInput" placeholder="https://script.google.com/macros/s/.../exec"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-indigo-500">
+          <p class="text-[11px] text-slate-400 mt-1">วาง Web App URL ที่ได้จาก Google Apps Script เพื่อให้ระบบส่งข้อมูลไปบันทึกบนคลาวด์</p>
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+          <input type="checkbox" id="autoSyncCheck" checked class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+          <label for="autoSyncCheck" class="text-xs text-slate-600 font-medium">ส่งข้อมูลเข้า Google Sheets ทันทีเมื่อกดคำนวณ</label>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
+        <button onclick="testSheetConnection()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition">
+          ทดสอบส่งข้อมูล
+        </button>
+        <button onclick="saveSettings()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-xl transition">
+          บันทึกการตั้งค่า
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Apps Script Code Modal -->
+  <div id="scriptModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-card rounded-2xl max-w-2xl w-full p-6 space-y-4 relative max-h-[85vh] flex flex-col shadow-2xl">
+      <button onclick="toggleModal('scriptModal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <div class="flex items-center gap-3 border-b border-slate-100 pb-3">
+        <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-lg">
+          <i class="fa-solid fa-code"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-800">โค้ดฝั่ง Google Apps Script (Code.gs)</h3>
+          <p class="text-xs text-slate-500">คัดลอกโค้ดนี้ไปวางในไฟล์ Code.gs ของ Google Sheets</p>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto bg-slate-900 rounded-xl p-4 text-xs font-mono text-emerald-400">
+        <pre id="codeSnippet">
+function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var data = JSON.parse(e.postData.contents);
+    
+    // สร้าง Header เมื่อใช้ชีตใหม่ครั้งแรก
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["วัน-เวลา", "ชื่อ-นามสกุล", "อายุ", "เพศ", "น้ำหนัก (kg)", "ส่วนสูง (cm)", "ค่า BMI", "ผลการประเมิน"]);
+    }
+    
+    // บันทึกข้อมูลแถวใหม่
+    sheet.appendRow([
+      data.timestamp || new Date().toLocaleString("th-TH"),
+      data.name,
+      data.age || "-",
+      data.gender || "-",
+      data.weight,
+      data.height,
+      data.bmi,
+      data.category
+    ]);
+    
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "success", message: "บันทึกเรียบร้อย" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+</pre>
+      </div>
+
+      <div class="flex items-center justify-between pt-2">
+        <p class="text-xs text-slate-500">ตั้งค่า Deploy: <b>Web app</b> &gt; Execute as: <b>Me</b> &gt; Who has access: <b>Anyone</b></p>
+        <button onclick="copyCodeSnippet()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-xl transition flex items-center gap-1.5">
+          <i class="fa-regular fa-copy"></i> คัดลอกโค้ด
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+  <script>
+    let userHistory = JSON.parse(localStorage.getItem('bmi_history') || '[]');
+    let sheetConfig = JSON.parse(localStorage.getItem('bmi_sheet_config') || '{"url": "", "autoSync": true}');
+    let bmiChartInstance = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('sheetUrlInput').value = sheetConfig.url || '';
+      document.getElementById('autoSyncCheck').checked = sheetConfig.autoSync !== false;
+      updateSyncStatusUI();
+      renderHistoryTable();
+      updateStatsAndChart();
+    });
+
+    function evaluateBMI(bmi) {
+      if (bmi < 18.5) {
+        return {
+          category: 'น้ำหนักน้อย / ผอม',
+          colorClass: 'bg-blue-100 text-blue-700',
+          position: Math.min((bmi / 18.5) * 20, 20),
+          tip: 'คุณมีน้ำหนักต่ำกว่าเกณฑ์มาตรฐาน ควรรับประทานอาหารที่มีสารอาหารครบถ้วน เพิ่มโปรตีนและออกกำลังกายเพื่อสร้างมวลกล้ามเนื้อ'
+        };
+      } else if (bmi <= 22.9) {
+        return {
+          category: 'ปกติ (สุขภาพดี)',
+          colorClass: 'bg-emerald-100 text-emerald-700',
+          position: 20 + (((bmi - 18.5) / 4.4) * 25),
+          tip: 'ยินดีด้วย! น้ำหนักของคุณอยู่ในเกณฑ์สมบูรณ์ ควบคุมอาหารและออกกำลังกายอย่างสม่ำเสมอเพื่อรักษาสุขภาพที่ดี'
+        };
+      } else if (bmi <= 24.9) {
+        return {
+          category: 'ท้วม / น้ำหนักเกิน',
+          colorClass: 'bg-yellow-100 text-yellow-800',
+          position: 45 + (((bmi - 23) / 1.9) * 15),
+          tip: 'น้ำหนักเริ่มเกินเกณฑ์มาตรฐานเล็กน้อย ควรเพิ่มการเคลื่อนไหวร่างกาย ลดหวาน มัน เค็ม เพื่อป้องกันการเข้าสู่ภาวะอ้วน'
+        };
+      } else if (bmi <= 29.9) {
+        return {
+          category: 'อ้วนระดับ 1',
+          colorClass: 'bg-orange-100 text-orange-800',
+          position: 60 + (((bmi - 25) / 4.9) * 20),
+          tip: 'เริ่มเข้าสู่ภาวะอ้วนระดับ 1 ควรวางแผนปรับเปลี่ยนพฤติกรรมการกินและออกกำลังกายแอโรบิกอย่างน้อย 150 นาที/สัปดาห์'
+        };
+      } else {
+        return {
+          category: 'อ้วนระดับ 2 (อ้วนมาก)',
+          colorClass: 'bg-red-100 text-red-800',
+          position: Math.min(80 + (((bmi - 30) / 10) * 20), 98),
+          tip: 'เสี่ยงต่อโรคเรื้อรัง (NCDs) เช่น เบาหวานและความดันโลหิตสูง ควรรับคำแนะนำจากแพทย์หรือนักโภชนาการ'
+        };
+      }
+    }
+
+    function calculateAndSave(event) {
+      event.preventDefault();
+
+      const name = document.getElementById('userName').value.trim();
+      const age = document.getElementById('userAge').value || '-';
+      const gender = document.getElementById('userGender').value;
+      const weight = parseFloat(document.getElementById('userWeight').value);
+      const height = parseFloat(document.getElementById('userHeight').value);
+
+      if (!name || isNaN(weight) || isNaN(height) || height <= 0 || weight <= 0) {
+        showNotification('กรุณากรอกข้อมูลน้ำหนักและส่วนสูงให้ถูกต้อง', 'error');
+        return;
+      }
+
+      // Formula: BMI = Weight (kg) / (Height (m) ^ 2)
+      const heightM = height / 100;
+      const bmi = parseFloat((weight / (heightM * heightM)).toFixed(2));
+      const evalResult = evaluateBMI(bmi);
+
+      // Target healthy weight range (Asian 18.5 - 22.9)
+      const minHealthyW = (18.5 * heightM * heightM).toFixed(1);
+      const maxHealthyW = (22.9 * heightM * heightM).toFixed(1);
+
+      const timestamp = new Date().toLocaleString('th-TH', { 
+        year: 'numeric', month: 'short', day: 'numeric', 
+        hour: '2-digit', minute: '2-digit' 
+      });
+
+      const record = {
+        id: Date.now(),
+        timestamp: timestamp,
+        name: name,
+        age: age,
+        gender: gender === 'male' ? 'ชาย' : (gender === 'female' ? 'หญิง' : 'อื่นๆ'),
+        weight: weight,
+        height: height,
+        bmi: bmi,
+        category: evalResult.category
+      };
+
+      // Display results in UI
+      document.getElementById('noResultPlaceholder').classList.add('hidden');
+      document.getElementById('resultContent').classList.remove('hidden');
+
+      document.getElementById('bmiScoreText').textContent = bmi.toFixed(1);
+      document.getElementById('userNameDisplay').textContent = `ผู้ประเมิน: คุณ${name} (${record.gender}, อายุ ${age})`;
+      document.getElementById('resultTimestamp').textContent = timestamp;
+
+      const badge = document.getElementById('bmiCategoryBadge');
+      badge.textContent = evalResult.category;
+      badge.className = `inline-block px-4 py-1.5 rounded-full text-sm font-bold ${evalResult.colorClass} mb-2`;
+
+      document.getElementById('healthyWeightRange').textContent = `น้ำหนักที่เหมาะสม: ${minHealthyW} - ${maxHealthyW} kg`;
+      document.getElementById('gaugeMarker').style.left = `${evalResult.position}%`;
+      document.getElementById('healthTipText').textContent = evalResult.tip;
+
+      // Save to local storage
+      userHistory.unshift(record);
+      localStorage.setItem('bmi_history', JSON.stringify(userHistory));
+
+      renderHistoryTable();
+      updateStatsAndChart();
+
+      showNotification(`คำนวณ BMI สำเร็จ (${bmi})`, 'success');
+
+      // Sync data to cloud sheet if endpoint configured
+      if (sheetConfig.url && sheetConfig.autoSync) {
+        sendDataToGoogleSheet(record);
+      }
+    }
+
+    async function sendDataToGoogleSheet(record) {
+      const btn = document.getElementById('submitBtn');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งข้อมูลลง Google Sheets...`;
+
+      try {
+        await fetch(sheetConfig.url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+
+        showNotification('บันทึกข้อมูลลง Google Sheets สำเร็จ!', 'success');
+      } catch (err) {
+        console.error('Sheet Sync Error:', err);
+        showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อ Google Sheets', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    function renderHistoryTable(filteredData = null) {
+      const data = filteredData || userHistory;
+      const tbody = document.getElementById('historyTableBody');
+      const emptyText = document.getElementById('noHistoryText');
+
+      tbody.innerHTML = '';
+
+      if (data.length === 0) {
+        emptyText.classList.remove('hidden');
+        return;
+      }
+
+      emptyText.classList.add('hidden');
+
+      data.forEach((item) => {
+        const evalRes = evaluateBMI(item.bmi);
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+        row.innerHTML = `
+          <td class="py-2.5 px-3 text-slate-500 text-[11px]">${item.timestamp}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-800">${escapeHtml(item.name)}</td>
+          <td class="py-2.5 px-3 text-slate-600">${item.weight} kg / ${item.height} cm</td>
+          <td class="py-2.5 px-3 font-bold text-indigo-600">${item.bmi}</td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${evalRes.colorClass}">
+              ${item.category}
+            </span>
+          </td>
+          <td class="py-2.5 px-3 text-right">
+            <button onclick="deleteRecord(${item.id})" title="ลบรายการ" class="text-slate-400 hover:text-rose-600 text-xs transition px-2 py-1">
+              <i class="fa-regular fa-trash-can"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function filterHistory() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = userHistory.filter(item => item.name.toLowerCase().includes(query));
+      renderHistoryTable(filtered);
+    }
+
+    function deleteRecord(id) {
+      userHistory = userHistory.filter(item => item.id !== id);
+      localStorage.setItem('bmi_history', JSON.stringify(userHistory));
+      renderHistoryTable();
+      updateStatsAndChart();
+      showNotification('ลบรายการสำเร็จ', 'info');
+    }
+
+    function clearHistory() {
+      if (userHistory.length === 0) return;
+      userHistory = [];
+      localStorage.removeItem('bmi_history');
+      renderHistoryTable();
+      updateStatsAndChart();
+      showNotification('ล้างประวัติทั้งหมดแล้ว', 'info');
+    }
+
+    function updateStatsAndChart() {
+      const total = userHistory.length;
+      document.getElementById('statTotalUsers').textContent = total;
+
+      if (total === 0) {
+        document.getElementById('statAvgBmi').textContent = '0.0';
+        renderChart([0, 0, 0, 0, 0]);
+        return;
+      }
+
+      const sumBmi = userHistory.reduce((acc, curr) => acc + curr.bmi, 0);
+      document.getElementById('statAvgBmi').textContent = (sumBmi / total).toFixed(1);
+
+      const counts = { 'ผอม': 0, 'ปกติ': 0, 'ท้วม': 0, 'อ้วน1': 0, 'อ้วน2': 0 };
+      userHistory.forEach(item => {
+        if (item.bmi < 18.5) counts['ผอม']++;
+        else if (item.bmi <= 22.9) counts['ปกติ']++;
+        else if (item.bmi <= 24.9) counts['ท้วม']++;
+        else if (item.bmi <= 29.9) counts['อ้วน1']++;
+        else counts['อ้วน2']++;
+      });
+
+      renderChart([counts['ผอม'], counts['ปกติ'], counts['ท้วม'], counts['อ้วน1'], counts['อ้วน2']]);
+    }
+
+    function renderChart(dataValues) {
+      const ctx = document.getElementById('bmiChart').getContext('2d');
+
+      if (bmiChartInstance) {
+        bmiChartInstance.destroy();
+      }
+
+      bmiChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['ผอม', 'ปกติ', 'ท้วม', 'อ้วน 1', 'อ้วน 2'],
+          datasets: [{
+            data: dataValues,
+            backgroundColor: ['#60a5fa', '#10b981', '#facc15', '#f97316', '#ef4444'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { family: 'Kanit', size: 10 } } }
+          }
+        }
+      });
+    }
+
+    function exportToCSV() {
+      if (userHistory.length === 0) {
+        showNotification('ไม่มีข้อมูลสำหรับส่งออก', 'error');
+        return;
+      }
+
+      let csv = '\uFEFFวัน-เวลา,ชื่อ-นามสกุล,อายุ,เพศ,น้ำหนัก (kg),ส่วนสูง (cm),ค่า BMI,ผลการประเมิน\n';
+      userHistory.forEach(item => {
+        csv += `"${item.timestamp}","${item.name}","${item.age}","${item.gender}",${item.weight},${item.height},${item.bmi},"${item.category}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', `bmi_records_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showNotification('ส่งออกไฟล์ CSV เรียบร้อยแล้ว', 'success');
+    }
+
+    function toggleModal(id) {
+      const modal = document.getElementById(id);
+      modal.classList.toggle('hidden');
+    }
+
+    function saveSettings() {
+      const url = document.getElementById('sheetUrlInput').value.trim();
+      const autoSync = document.getElementById('autoSyncCheck').checked;
+
+      sheetConfig = { url, autoSync };
+      localStorage.setItem('bmi_sheet_config', JSON.stringify(sheetConfig));
+
+      updateSyncStatusUI();
+      toggleModal('settingsModal');
+      showNotification('บันทึกการตั้งค่าแล้ว', 'success');
+    }
+
+    function updateSyncStatusUI() {
+      const statusEl = document.getElementById('syncStatusText');
+      if (sheetConfig.url) {
+        statusEl.textContent = 'เชื่อมต่อแล้ว (พร้อมทำงาน)';
+        statusEl.className = 'text-sm font-bold text-emerald-600';
+      } else {
+        statusEl.textContent = 'ยังไม่ได้เชื่อมต่อ URL';
+        statusEl.className = 'text-sm font-bold text-amber-600';
+      }
+    }
+
+    async function testSheetConnection() {
+      const url = document.getElementById('sheetUrlInput').value.trim();
+      if (!url) {
+        showNotification('กรุณากรอก Web App URL ก่อนทดสอบ', 'error');
+        return;
+      }
+
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timestamp: new Date().toLocaleString('th-TH'),
+            name: 'ทดสอบระบบ',
+            age: '20',
+            gender: 'ชาย',
+            weight: 60,
+            height: 170,
+            bmi: 20.76,
+            category: 'ปกติ (ทดสอบการเชื่อมต่อ)'
+          })
+        });
+        showNotification('ส่งข้อมูลทดสอบเรียบร้อยแล้ว', 'success');
+      } catch (e) {
+        showNotification('ไม่สามารถเชื่อมต่อได้: ' + e.message, 'error');
+      }
+    }
+
+    function copyCodeSnippet() {
+      const code = document.getElementById('codeSnippet').innerText;
+      const textarea = document.createElement('textarea');
+      textarea.value = code;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      showNotification('คัดลอกโค้ด Google Apps Script เรียบร้อยแล้ว!', 'success');
+    }
+
+    function showNotification(msg, type = 'info') {
+      const toastContainer = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      const bgColors = {
+        success: 'bg-emerald-600',
+        error: 'bg-rose-600',
+        info: 'bg-slate-800'
+      };
+
+      toast.className = `px-4 py-3 rounded-xl shadow-xl text-xs font-medium text-white transition transform duration-300 flex items-center gap-2 ${bgColors[type] || bgColors.info}`;
+      toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span>${msg}</span>`;
+      
+      toastContainer.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+  </script>
+</body>
+</html>
